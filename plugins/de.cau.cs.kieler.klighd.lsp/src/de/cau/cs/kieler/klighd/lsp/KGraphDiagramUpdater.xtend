@@ -298,7 +298,9 @@ class KGraphDiagramUpdater extends DiagramUpdater {
             case "full": {
                 val diagramGenerator = diagramGeneratorProvider.get as KGraphDiagramGenerator
                 diagramGenerator.activeTracing = shouldSelectText
+                System.out.println("SGraph Generation Start: " + System.currentTimeMillis)
                 val sGraph = diagramGenerator.toSGraph(viewContext.viewModel, uri, cancelIndicator)
+                System.out.println("SGraph Generation End: " + System.currentTimeMillis)
                 synchronized (diagramState) {
                     diagramState.putKGraphToSModelElementMap(uri, diagramGenerator.getKGraphToSModelElementMap)
                     diagramState.putIdToKGraphElementMap(uri, diagramGenerator.idToKGraphElementMap)

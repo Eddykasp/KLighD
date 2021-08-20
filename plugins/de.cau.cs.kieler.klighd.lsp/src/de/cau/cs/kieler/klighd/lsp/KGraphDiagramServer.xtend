@@ -182,6 +182,7 @@ class KGraphDiagramServer extends LanguageAwareDiagramServer {
                 } else {
                     val textDiagram = KGraphDiagramGenerator.generateTextDiagram(texts, newRoot.id)
                     dispatch(new RequestTextBoundsAction(textDiagram))
+                    System.out.println("RequestTextBounds Sent: " + System.currentTimeMillis)
                     // the setOrUpdateModel is then executed after the client returns with its ComputedTextBoundsAction
                 }
                 
@@ -397,6 +398,7 @@ class KGraphDiagramServer extends LanguageAwareDiagramServer {
                 } else {
                     dispatch(new SetModelAction(newRoot));    // this should only send model root with new approach
                 }
+                System.out.println("Model Sent: " + System.currentTimeMillis)
                 lastSubmittedModelType = modelType;
                 var IModelUpdateListener listener = getModelUpdateListener();
                 if (listener !== null) {
@@ -412,6 +414,7 @@ class KGraphDiagramServer extends LanguageAwareDiagramServer {
      * and updates the model on the client.
      */
     protected def handle(ComputedTextBoundsAction action) {
+        System.out.println("ComputedTextBounds: " + System.currentTimeMillis)
         synchronized (modelLock) {
             if (currentRoot.getRevision() !== action.getRevision()) {
                 return
@@ -486,6 +489,7 @@ class KGraphDiagramServer extends LanguageAwareDiagramServer {
      * FIXME Remove this if UpdateModelAction has a cause.
      */
     override protected handle(RequestModelAction request) {
+        System.out.println("RequestModelAction: " + System.currentTimeMillis);
         if (model.type == 'NONE' && diagramLanguageServer !== null) {
             if (!request.requestId.nullOrEmpty)
                 LOG.warn("Model requests are not supported by the Xtext diagram server.")

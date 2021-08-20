@@ -49,10 +49,14 @@ class KGraphLayoutEngine extends ElkLayoutEngine {
     	    if (root instanceof SGraph) {
     	        // The layout is executed on the KGraph, not the SGraph. So get the KGraph belonging to this SGraph from
     	        // the KGraphContext.
+    	        System.out.println("KGraph Layout Start: " + System.currentTimeMillis)
                 onlyLayoutOnKGraph(root.id)
+                System.out.println("KGraph Layout End: " + System.currentTimeMillis)
 
                 // map layouted KGraph to SGraph
+                System.out.println("Layout Mapping Start: " + System.currentTimeMillis)
                 KGraphMappingUtil.mapLayout(diagramState.getKGraphToSModelElementMap(root.id))
+                System.out.println("Layout Mapping End: " + System.currentTimeMillis)
             }
         }
     }
