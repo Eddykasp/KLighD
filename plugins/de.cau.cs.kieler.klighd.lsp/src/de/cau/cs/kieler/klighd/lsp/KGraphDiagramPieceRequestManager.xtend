@@ -3,7 +3,7 @@
  *
  * http://rtsys.informatik.uni-kiel.de/kieler
  * 
- * Copyright ${year} by
+ * Copyright 2021 by
  * + Kiel University
  *   + Department of Computer Science
  *     + Real-Time and Embedded Systems Group
@@ -12,21 +12,21 @@
  */
 package de.cau.cs.kieler.klighd.lsp
 
-import org.eclipse.xtend.lib.annotations.Accessors
-import org.eclipse.sprotty.SModelElement
-import java.util.LinkedList
-import java.util.Queue
 import de.cau.cs.kieler.klighd.lsp.model.RequestDiagramPieceAction
 import de.cau.cs.kieler.klighd.lsp.model.SKEdge
+import de.cau.cs.kieler.klighd.lsp.model.SKLabel
 import de.cau.cs.kieler.klighd.lsp.model.SKNode
 import de.cau.cs.kieler.klighd.lsp.model.SKPort
-import de.cau.cs.kieler.klighd.lsp.model.SKLabel
+import java.util.LinkedList
+import java.util.Queue
+import org.eclipse.sprotty.SModelElement
+import org.eclipse.xtend.lib.annotations.Accessors
 
 /**
  * Class to keep track of incoming piece requests and responsible for managing the piece generation, ensuring the 
  * requested pieces are retrieved if they already exist or generated as soon as possible if not. The updater is then
  * responsible for sending the pieces to the client.
- * @author max
+ * @author mka
  */
 class KGraphDiagramPieceRequestManager {
     
@@ -76,7 +76,7 @@ class KGraphDiagramPieceRequestManager {
             
             if (diagramGenerator.nodeChildrenAllProcessed(kGraphElement)) {
                 val sModelElement = diagramGenerator.KGraphToSModelElementMap.get(kGraphElement)
-                return copyAndTrimChildren(sModelElement) // TODO: make copy and replace children with stubs
+                return copyAndTrimChildren(sModelElement) 
             } else {
                 generateNextFirst = true
             }
@@ -93,8 +93,19 @@ class KGraphDiagramPieceRequestManager {
         }
     }
     
+    /**
+     * This method currently does nothing, but the idea behind it is to further decrease the
+     * network payload when sending diagram pieces. What can happen in theory
+     * is that a piece may only be requested after some of its children have also already been generated.
+     * This doesn't happen in the current implementation, because the client will only request pieces
+     * in a strict top-down order, however in the case in the future that the client should have some
+     * more advanced piece management capabilities including removal of pieces that are not required 
+     * at that time to save space for example in the case of very large graphs, it becomes relevant to
+     * actually only send the requested piece and not an entire graph that is dangling from it as well.
+     * The cost of this lies on the server (copying and trimming data) and remains to be analyzed and implemented.
+     */
     private def SModelElement copyAndTrimChildren(SModelElement original) {
-        
+        // TODO: make copy and replace children with stubs
         if (original instanceof SKEdge) {
             // copy edge
         } else if (original instanceof SKNode) {
@@ -104,7 +115,6 @@ class KGraphDiagramPieceRequestManager {
         } else if (original instanceof SKLabel) {
             // copy label
         }
-        // TODO: Implement this function
         return original
     }
 }

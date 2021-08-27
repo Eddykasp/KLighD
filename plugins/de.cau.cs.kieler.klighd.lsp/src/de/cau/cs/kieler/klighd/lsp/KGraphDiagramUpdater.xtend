@@ -23,33 +23,23 @@ import de.cau.cs.kieler.klighd.ViewContext
 import de.cau.cs.kieler.klighd.ide.model.MessageModel
 import de.cau.cs.kieler.klighd.kgraph.KNode
 import de.cau.cs.kieler.klighd.lsp.launch.AbstractLanguageServer
-import de.cau.cs.kieler.klighd.lsp.model.LayoutOptionUIData
+import de.cau.cs.kieler.klighd.lsp.model.RequestDiagramPieceAction
 import de.cau.cs.kieler.klighd.lsp.model.SKGraph
-import de.cau.cs.kieler.klighd.lsp.model.ValuedSynthesisOption
+import de.cau.cs.kieler.klighd.lsp.utils.KGraphMappingUtil
 import de.cau.cs.kieler.klighd.util.KlighdSynthesisProperties
-import java.util.ArrayList
-import java.util.Collection
 import java.util.HashSet
 import java.util.List
 import java.util.Map
 import java.util.concurrent.CompletableFuture
-import org.eclipse.elk.core.data.LayoutMetaDataService
-import org.eclipse.elk.core.data.LayoutOptionData
-import org.eclipse.elk.core.data.LayoutOptionData.Visibility
-import org.eclipse.elk.core.util.Pair
-import org.eclipse.elk.graph.properties.IProperty
 import org.eclipse.emf.common.util.URI
 import org.eclipse.emf.ecore.EObject
 import org.eclipse.sprotty.IDiagramServer
 import org.eclipse.sprotty.SGraph
+import org.eclipse.sprotty.SModelElement
 import org.eclipse.sprotty.xtext.ILanguageAwareDiagramServer
 import org.eclipse.sprotty.xtext.ls.DiagramLanguageServer
 import org.eclipse.sprotty.xtext.ls.DiagramUpdater
 import org.eclipse.xtext.util.CancelIndicator
-import org.eclipse.sprotty.xtext.IDiagramGenerator
-import org.eclipse.sprotty.SModelElement
-import de.cau.cs.kieler.klighd.lsp.utils.KGraphMappingUtil
-import de.cau.cs.kieler.klighd.lsp.model.RequestDiagramPieceAction
 
 /**
  * Connection between {@link IDiagramServer} and the {@link DiagramLanguageServer}. With this singleton diagram updater,
@@ -278,7 +268,6 @@ class KGraphDiagramUpdater extends DiagramUpdater {
     synchronized def SGraph createModel(ViewContext viewContext, String uri, CancelIndicator cancelIndicator) {
         // Generate the SGraph model from the KGraph model and store every later relevant part in the
         // diagram state.
-        // val diagramGenerator = diagramGeneratorProvider.get
         
         // FIXME: currently collapsing and expanding all regions breaks the diagram somehow, apparently not always
         //        maybe when hierarchy is low so some elements aren't rendered and "get lost" when collapsing and 
@@ -293,43 +282,34 @@ class KGraphDiagramUpdater extends DiagramUpdater {
         
         // FIXME: extract this to some other strategy manager that can handle passing the options
         //        idea: abstract superclass KGraphDiagramGenerator
-        // var IDiagramGenerator diagramGenerator
-        switch (diagramGeneratorType){
-            case "full": {
-                val diagramGenerator = diagramGeneratorProvider.get as KGraphDiagramGenerator
-                diagramGenerator.activeTracing = shouldSelectText
-                System.out.println("SGraph Generation Start: " + System.currentTimeMillis)
-                val sGraph = diagramGenerator.toSGraph(viewContext.viewModel, uri, cancelIndicator)
-                System.out.println("SGraph Generation End: " + System.currentTimeMillis)
-                synchronized (diagramState) {
-                    diagramState.putKGraphToSModelElementMap(uri, diagramGenerator.getKGraphToSModelElementMap)
-                    diagramState.putIdToKGraphElementMap(uri, diagramGenerator.idToKGraphElementMap)
-                    diagramState.putTexts(uri, diagramGenerator.getModelLabels)
-                    diagramState.putTextMapping(uri, diagramGenerator.getTextMapping)
-                    diagramState.putImageData(uri, diagramGenerator.images)
-                }
 
-                return sGraph
-            }
-            case "iterative": {
-                val diagramGenerator = incrementalDiagramGeneratorProvider.get as KGraphIncrementalDiagramGenerator
-                diagramGenerator.activeTracing = shouldSelectText
-                val sGraph = diagramGenerator.toSGraph(viewContext.viewModel, uri, cancelIndicator)
-                val requestManager = new KGraphDiagramPieceRequestManager(diagramGenerator)
-                synchronized (diagramState) {
-                    diagramState.putKGraphToSModelElementMap(uri, diagramGenerator.getKGraphToSModelElementMap)
-                    diagramState.putIdToKGraphElementMap(uri, diagramGenerator.idToKGraphElementMap)
-                    diagramState.putTexts(uri, diagramGenerator.getModelLabels)
-                    diagramState.putTextMapping(uri, diagramGenerator.getTextMapping)
-                    diagramState.putImageData(uri, diagramGenerator.images)
-                    
-                    diagramState.putDiagramPieceRequestManager(uri, requestManager)
-                }
+        var diagramGenerator = diagramGeneratorProvider.get as KGraphDiagramGenerator
         
-                return sGraph
-            }
-                
+        if (diagramGeneratorType.equals("iterative")) {
+            diagramGenerator = incrementalDiagramGeneratorProvider.get as KGraphIncrementalDiagramGenerator
         }
+        
+        diagramGenerator.activeTracing = shouldSelectText
+        System.out.println("SGraph Generation Start: " + System.currentTimeMillis)
+        val sGraph = diagramGenerator.toSGraph(viewContext.viewModel, uri, cancelIndicator)
+        System.out.println("SGraph Generation End: " + System.currentTimeMillis)
+        
+        if (diagramGeneratorType.equals("iterative")) {
+            val requestManager = new KGraphDiagramPieceRequestManager(diagramGenerator as KGraphIncrementalDiagramGenerator)
+            synchronized (diagramState) {
+                diagramState.putDiagramPieceRequestManager(uri, requestManager)
+            }
+        }
+        
+        synchronized (diagramState) {
+            diagramState.putKGraphToSModelElementMap(uri, diagramGenerator.getKGraphToSModelElementMap)
+            diagramState.putIdToKGraphElementMap(uri, diagramGenerator.idToKGraphElementMap)
+            diagramState.putTexts(uri, diagramGenerator.getModelLabels)
+            diagramState.putTextMapping(uri, diagramGenerator.getTextMapping)
+            diagramState.putImageData(uri, diagramGenerator.images)
+        }
+        
+        return sGraph
         
     }
 
@@ -417,6 +397,9 @@ class KGraphDiagramUpdater extends DiagramUpdater {
         updateDiagrams(uris)
     }
     
+    /**
+     * Gets the next diagram piece requested by the client.
+     */
     def SModelElement getNextDiagramPiece(KGraphDiagramServer server, RequestDiagramPieceAction request) {
         synchronized (diagramState) {
             val requestManager = diagramState.getDiagramPieceRequestManager(server.sourceUri)

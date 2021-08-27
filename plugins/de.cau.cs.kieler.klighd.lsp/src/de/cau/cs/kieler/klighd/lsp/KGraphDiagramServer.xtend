@@ -32,12 +32,16 @@ import de.cau.cs.kieler.klighd.lsp.launch.AbstractLanguageServer
 import de.cau.cs.kieler.klighd.lsp.model.CheckImagesAction
 import de.cau.cs.kieler.klighd.lsp.model.CheckedImagesAction
 import de.cau.cs.kieler.klighd.lsp.model.ComputedTextBoundsAction
+import de.cau.cs.kieler.klighd.lsp.model.IncrementalComputedTextBoundsAction
+import de.cau.cs.kieler.klighd.lsp.model.IncrementalRequestTextBoundsAction
 import de.cau.cs.kieler.klighd.lsp.model.LayoutOptionUIData
 import de.cau.cs.kieler.klighd.lsp.model.PerformActionAction
 import de.cau.cs.kieler.klighd.lsp.model.RefreshDiagramAction
 import de.cau.cs.kieler.klighd.lsp.model.RefreshLayoutAction
+import de.cau.cs.kieler.klighd.lsp.model.RequestDiagramPieceAction
 import de.cau.cs.kieler.klighd.lsp.model.RequestTextBoundsAction
 import de.cau.cs.kieler.klighd.lsp.model.SKGraph
+import de.cau.cs.kieler.klighd.lsp.model.SetDiagramPieceAction
 import de.cau.cs.kieler.klighd.lsp.model.SetSynthesisAction
 import de.cau.cs.kieler.klighd.lsp.model.StoreImagesAction
 import de.cau.cs.kieler.klighd.lsp.model.UpdateDiagramOptionsAction
@@ -66,6 +70,7 @@ import org.eclipse.sprotty.ActionMessage
 import org.eclipse.sprotty.ILayoutEngine
 import org.eclipse.sprotty.IModelUpdateListener
 import org.eclipse.sprotty.LayoutAction
+import org.eclipse.sprotty.RejectAction
 import org.eclipse.sprotty.RequestBoundsAction
 import org.eclipse.sprotty.RequestModelAction
 import org.eclipse.sprotty.SModelCloner
@@ -77,11 +82,6 @@ import org.eclipse.sprotty.SetModelAction
 import org.eclipse.sprotty.UpdateModelAction
 import org.eclipse.sprotty.xtext.LanguageAwareDiagramServer
 import org.eclipse.xtend.lib.annotations.Accessors
-import de.cau.cs.kieler.klighd.lsp.model.RequestDiagramPieceAction
-import de.cau.cs.kieler.klighd.lsp.model.SetDiagramPieceAction
-import org.eclipse.sprotty.RejectAction
-import de.cau.cs.kieler.klighd.lsp.model.IncrementalRequestTextBoundsAction
-import de.cau.cs.kieler.klighd.lsp.model.IncrementalComputedTextBoundsAction
 
 /**
  * Diagram server extension adding functionality to special actions needed for handling KGraphs.
@@ -394,9 +394,9 @@ class KGraphDiagramServer extends LanguageAwareDiagramServer {
                     response.setResponseId(request.getRequestId());
                     dispatch(response);
                 } else if (update && modelType !== null && modelType.equals(lastSubmittedModelType)) {
-                    dispatch(new UpdateModelAction(newRoot)); // this should only send model root with new approach
+                    dispatch(new UpdateModelAction(newRoot));
                 } else {
-                    dispatch(new SetModelAction(newRoot));    // this should only send model root with new approach
+                    dispatch(new SetModelAction(newRoot));
                 }
                 System.out.println("Model Sent: " + System.currentTimeMillis)
                 lastSubmittedModelType = modelType;
@@ -668,6 +668,10 @@ class KGraphDiagramServer extends LanguageAwareDiagramServer {
                 dispatch(new RejectAction())
                 return
             }
+            // FIXME: The texts are not handled incrementally at the moment, which is a performance issue
+            //        as all texts are retrieved for every piece request. This needs to be changed to only
+            //        retrieve the new texts. The implementation for this should probably be in the incremental
+            //        diagram generator or maybe also using the piece request manager
             val texts = diagramState.getTexts(this.sourceUri)
             if (texts === null) {
                 throw new NullPointerException("The id of the SGraph was not found in the diagramState")
@@ -700,8 +704,9 @@ class KGraphDiagramServer extends LanguageAwareDiagramServer {
     protected def handle(IncrementalComputedTextBoundsAction action) {
                 
         synchronized (modelLock) {
-            /* 
-             * revision numbers lose their meaning a bit in this incremental concept so ignore this for now
+            /* FIXME: revision numbers should just stay constant during the incremental build-up process
+             *        the question is where the revision number is set for an action, I assume on Keith,
+             *        but I don't know where
             if (currentRoot.getRevision() !== action.getRevision()) {
                 return
             }
